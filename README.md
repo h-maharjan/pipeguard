@@ -1,16 +1,15 @@
-# PipeGuard - Phase 2
+# PipeGuard - Phase 3
 
-Phase 2 implements:
+Phase 3 implements:
 
 - Accepting a GitHub repository URL from the dashboard
-- Cloning that repository on the backend
-- Detecting whether a cloned repository has a `Dockerfile`
-- Reporting repositories without `Dockerfile` as unsupported
-- Building Docker images when `Dockerfile` exists
-- Running `npm audit --json` and parsing dependency vulnerability summary
-- Running Trivy image scan (`trivy image --format json`) and parsing severity summary
-- Streaming live backend logs to the dashboard
-- Displaying project history in the dashboard
+- Running the existing Phase 2 clone/build/security scan pipeline
+- Triggering a Jenkins job from the backend (`buildWithParameters`)
+- Polling Jenkins build status and fetching console logs
+- Persisting build history in PostgreSQL (`build_runs` table)
+- Generating a polished HTML report for each build run
+- Converting that report to PDF with Puppeteer
+- Allowing users to revisit previous HTML reports and download PDFs
 
 ## Prerequisites
 
@@ -19,6 +18,7 @@ Phase 2 implements:
 - `git` installed on the server runtime
 - `docker` installed and daemon running (for image builds)
 - `trivy` installed and available on PATH (for image scan)
+- Jenkins server reachable from backend runtime
 
 ## Environment variables
 
@@ -34,10 +34,22 @@ or:
 - `PGPASSWORD`
 - `PGDATABASE`
 
-Optional:
+Required for Jenkins integration:
+
+- `JENKINS_URL` (example: `https://jenkins.example.com`)
+- `JENKINS_JOB` (job name)
+- `JENKINS_USER`
+- `JENKINS_API_TOKEN`
+
+Optional for Jenkins job tokenized triggers:
+
+- `JENKINS_BUILD_TOKEN`
+
+Optional runtime settings:
 
 - `PORT` (default `3000`)
 - `CLONE_BASE_DIR` (default `/tmp/pipeguard/repos`)
+- `REPORTS_DIR` (default `/tmp/pipeguard/reports`)
 
 ## Run locally
 
@@ -48,4 +60,4 @@ npm start
 
 Open `http://localhost:3000`.
 
-On startup, the server creates/updates the `projects` table if needed.
+On startup, the server creates/updates the `projects` and `build_runs` tables if needed.
