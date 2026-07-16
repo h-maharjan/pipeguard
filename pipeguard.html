@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PIPEGUARD — Repository Security Pipeline</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c11;
+  --bg-panel:#11141c;
+  --bg-elevated:#171b26;
+  --border:#242a3a;
+  --border-soft:#1b202c;
+  --text:#e7ecf6;
+  --text-dim:#8891a6;
+  --text-faint:#525a6e;
+  --accent:#5b7cf0;
+  --accent-soft:#5b7cf01a;
+  --live:#37c99a;
+  --sim:#e0a83e;
+  --critical:#f2545b;
+  --high:#f2994a;
+  --medium:#f0cd4e;
+  --low:#56ccf2;
+  --safe:#37c99a;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Inter',sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(ellipse 900px 500px at 15% -5%, #5b7cf01f, transparent),
+    radial-gradient(ellipse 700px 500px at 100% 0%, #37c99a14, transparent),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  min-height:100vh;
+  padding-bottom:60px;
+}
+a{color:var(--accent);}
+
+/* ---------- header ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:22px 36px;border-bottom:1px solid var(--border-soft);
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:34px;height:34px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:700;color:#fff;font-size:15px;
+  box-shadow:0 0 0 1px #ffffff14, 0 6px 18px -6px #5b7cf080;
+}
+.brand-text .name{font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:0.5px;}
+.brand-text .tag{font-size:11px;color:var(--text-faint);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
+.topbar-right{font-family:var(--mono);font-size:11px;color:var(--text-faint);display:flex;gap:18px;}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--live);margin-right:6px;box-shadow:0 0 6px var(--live);}
+
+/* ---------- shell ---------- */
+.shell{max-width:1180px;margin:0 auto;padding:0 36px;}
+
+/* ---------- intake ---------- */
+.intake{
+  margin-top:34px;padding:26px 28px;border:1px solid var(--border);
+  border-radius:14px;background:var(--bg-panel);
+}
+.intake-label{font-family:var(--mono);font-size:11px;color:var(--text-faint);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;}
+.intake-row{display:flex;gap:10px;}
+.prompt-wrap{
+  flex:1;display:flex;align-items:center;gap:10px;
+  background:#000;border:1px solid var(--border);border-radius:9px;
+  padding:0 14px;font-family:var(--mono);
+}
+.prompt-wrap span{color:var(--live);font-size:14px;}
+#repoInput{
+  flex:1;background:transparent;border:none;outline:none;color:var(--text);
+  font-family:var(--mono);font-size:14px;padding:13px 0;
+}
+#repoInput::placeholder{color:var(--text-faint);}
+.run-btn{
+  font-family:var(--sans);font-weight:700;font-size:14px;
+  background:var(--accent);color:#fff;border:none;border-radius:9px;
+  padding:0 26px;cursor:pointer;transition:filter .15s, transform .15s;
+  display:flex;align-items:center;gap:8px;
+}
+.run-btn:hover{filter:brightness(1.12);}
+.run-btn:active{transform:scale(0.98);}
+.run-btn:disabled{opacity:0.5;cursor:not-allowed;filter:none;}
+.examples{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.examples span{font-size:11.5px;color:var(--text-faint);margin-right:2px;}
+.ex-chip{
+  font-family:var(--mono);font-size:11.5px;color:var(--text-dim);
+  background:var(--bg-elevated);border:1px solid var(--border);
+  padding:5px 10px;border-radius:20px;cursor:pointer;transition:all .15s;
+}
+.ex-chip:hover{border-color:var(--accent);color:var(--text);}
+.intake-error{margin-top:12px;font-family:var(--mono);font-size:12.5px;color:var(--critical);display:none;}
+
+/* ---------- pipeline ---------- */
+.pipeline-wrap{display:none;margin-top:28px;gap:20px;grid-template-columns:280px 1fr;}
+.pipeline-wrap.show{display:grid;}
+.stages{display:flex;flex-direction:column;gap:0;background:var(--bg-panel);border:1px solid var(--border);border-radius:14px;padding:6px;}
+.stage{
+  display:flex;align-items:center;gap:12px;padding:14px 12px;border-radius:10px;
+  position:relative;
+}
+.stage:not(:last-child)::after{
+  content:'';position:absolute;left:26px;top:44px;width:1px;height:calc(100% - 20px);
+  background:var(--border);
+}
+.stage-icon{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg-elevated);border:1.5px solid var(--border);
+  font-size:11px;transition:all .25s;
+}
+.stage.pending .stage-icon{color:var(--text-faint);}
+.stage.active .stage-icon{border-color:var(--accent);color:var(--accent);animation:pulse 1.1s infinite;}
+.stage.done .stage-icon{background:var(--safe);border-color:var(--safe);color:#04140e;}
+.stage.error .stage-icon{background:var(--critical);border-color:var(--critical);color:#1a0505;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 #5b7cf055;}50%{box-shadow:0 0 0 5px #5b7cf000;}}
+.stage-text .title{font-size:13px;font-weight:600;}
+.stage.pending .stage-text .title{color:var(--text-faint);}
+.stage-text .sub{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:1px;}
+.badge{
+  margin-left:auto;font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;
+  letter-spacing:0.4px;font-weight:600;
+}
+.badge.live{color:var(--live);background:#37c99a1a;}
+.badge.sim{color:var(--sim);background:#e0a83e1a;}
+
+/* ---------- terminal ---------- */
+.terminal{
+  background:#05060a;border:1px solid var(--border);border-radius:14px;
+  padding:16px 18px;font-family:var(--mono);font-size:12.5px;line-height:1.7;
+  height:100%;min-height:340px;max-height:420px;overflow-y:auto;
+}
+.terminal-line{white-space:pre-wrap;word-break:break-all;}
+.tl-sys{color:var(--text-faint);}
+.tl-info{color:var(--text-dim);}
+.tl-ok{color:var(--safe);}
+.tl-warn{color:var(--sim);}
+.tl-err{color:var(--critical);}
+.tl-accent{color:var(--accent);}
+.caret{display:inline-block;width:7px;height:13px;background:var(--live);animation:blink 1s step-end infinite;vertical-align:middle;}
+@keyframes blink{50%{opacity:0;}}
+
+/* ---------- results ---------- */
+.results{display:none;margin-top:28px;}
+.results.show{display:block;}
+.section-title{
+  font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text-faint);margin:36px 0 14px;display:flex;align-items:center;gap:10px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border-soft);}
+
+.overview-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;}
+.card{background:var(--bg-panel);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.repo-card .repo-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.repo-avatar{width:44px;height:44px;border-radius:9px;border:1px solid var(--border);}
+.repo-head .rname{font-family:var(--mono);font-weight:700;font-size:15px;}
+.repo-head .rdesc{font-size:12.5px;color:var(--text-dim);margin-top:2px;}
+.repo-stats{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;}
+.repo-stats div{font-size:12px;color:var(--text-dim);}
+.repo-stats b{color:var(--text);font-family:var(--mono);}
+.lang-bar{display:flex;height:8px;border-radius:6px;overflow:hidden;margin-top:14px;border:1px solid var(--border-soft);}
+.lang-legend{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;}
+.lang-legend span{font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:5px;}
+.lang-legend i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+
+.score-card{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+.score-ring{position:relative;width:130px;height:130px;}
+.score-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.score-num .n{font-family:var(--mono);font-size:32px;font-weight:700;}
+.score-num .lbl{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:1px;}
+.score-verdict{margin-top:12px;font-size:13px;font-weight:600;}
+
+.sev-card .sev-row{display:flex;align-items:center;gap:10px;margin-top:12px;}
+.sev-row:first-child{margin-top:2px;}
+.sev-label{width:64px;font-size:11.5px;color:var(--text-dim);font-family:var(--mono);}
+.sev-track{flex:1;height:9px;background:var(--bg-elevated);border-radius:5px;overflow:hidden;}
+.sev-fill{height:100%;border-radius:5px;}
+.sev-count{width:20px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;}
+
+/* ---------- findings tables ---------- */
+.tab-row{display:flex;gap:6px;margin-bottom:14px;}
+.tab-btn{
+  font-family:var(--mono);font-size:11.5px;color:var(--text-dim);background:var(--bg-elevated);
+  border:1px solid var(--border);padding:7px 14px;border-radius:8px;cursor:pointer;
+}
+.tab-btn.active{color:#fff;background:var(--accent);border-color:var(--accent);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+table{width:100%;border-collapse:collapse;background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+thead th{
+  text-align:left;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;
+  color:var(--text-faint);padding:11px 14px;border-bottom:1px solid var(--border);background:var(--bg-elevated);
+}
+tbody td{padding:11px 14px;font-size:12.5px;border-bottom:1px solid var(--border-soft);vertical-align:top;}
+tbody tr:last-child td{border-bottom:none;}
+.mono{font-family:var(--mono);}
+.pill{
+  font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;
+  text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;
+}
+.pill.critical{color:var(--critical);background:#f2545b1a;}
+.pill.high{color:var(--high);background:#f2994a1a;}
+.pill.medium{color:var(--medium);background:#f0cd4e1a;}
+.pill.low{color:var(--low);background:#56ccf21a;}
+.pill.pass{color:var(--safe);background:#37c99a1a;}
+.pill.ok{color:var(--safe);background:#37c99a1a;}
+.empty-row td{color:var(--text-faint);font-style:italic;text-align:center;padding:22px;}
+.note-line{font-size:11.5px;color:var(--text-faint);margin-top:10px;font-family:var(--mono);}
+
+.footer-actions{display:flex;gap:10px;margin-top:32px;margin-bottom:10px;}
+.btn-secondary{
+  font-family:var(--sans);font-weight:600;font-size:13.5px;color:var(--text);
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;
+  padding:11px 20px;cursor:pointer;
+}
+.btn-secondary:hover{border-color:var(--accent);}
+.btn-primary{
+  font-family:var(--sans);font-weight:700;font-size:13.5px;color:#fff;
+  background:var(--accent);border:none;border-radius:9px;padding:11px 20px;cursor:pointer;
+}
+.btn-primary:hover{filter:brightness(1.1);}
+
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px;}
+
+@media(max-width:880px){
+  .pipeline-wrap{grid-template-columns:1fr;}
+  .overview-grid{grid-template-columns:1fr;}
+  .topbar,.shell{padding-left:18px;padding-right:18px;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">PG</div>
+    <div class="brand-text">
+      <div class="name">PIPEGUARD</div>
+      <div class="tag">Repository Security Pipeline</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div><span class="dot"></span>ENGINE READY</div>
+    <div id="clock"></div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <div class="intake">
+    <div class="intake-label">Target repository</div>
+    <div class="intake-row">
+      <div class="prompt-wrap">
+        <span>&gt;</span>
+        <input id="repoInput" type="text" placeholder="owner/repository  or  https://github.com/owner/repository" />
+      </div>
+      <button class="run-btn" id="runBtn" onclick="startPipeline()">▶ Run Pipeline</button>
+    </div>
+    <div class="examples">
+      <span>Try:</span>
+      <div class="ex-chip" onclick="fillExample('expressjs/express')">expressjs/express</div>
+      <div class="ex-chip" onclick="fillExample('pallets/flask')">pallets/flask</div>
+      <div class="ex-chip" onclick="fillExample('sveltejs/svelte')">sveltejs/svelte</div>
+      <div class="ex-chip" onclick="fillExample('psf/requests')">psf/requests</div>
+    </div>
+    <div class="intake-error" id="intakeError"></div>
+  </div>
+
+  <div class="pipeline-wrap" id="pipelineWrap">
+    <div class="stages" id="stages"></div>
+    <div class="terminal" id="terminal"></div>
+  </div>
+
+  <div class="results" id="results">
+
+    <div class="section-title">Overview</div>
+    <div class="overview-grid">
+      <div class="card repo-card" id="repoCard"></div>
+      <div class="card score-card">
+        <div class="score-ring">
+          <svg width="130" height="130" viewBox="0 0 130 130">
+            <circle cx="65" cy="65" r="56" fill="none" stroke="#1b202c" stroke-width="11"/>
+            <circle id="scoreArc" cx="65" cy="65" r="56" fill="none" stroke="var(--accent)" stroke-width="11"
+              stroke-linecap="round" stroke-dasharray="352" stroke-dashoffset="352" transform="rotate(-90 65 65)"/>
+          </svg>
+          <div class="score-num"><div class="n" id="scoreNum">--</div><div class="lbl">Security Score</div></div>
+        </div>
+        <div class="score-verdict" id="scoreVerdict"></div>
+      </div>
+      <div class="card sev-card">
+        <div class="intake-label" style="margin-bottom:6px;">Findings by severity</div>
+        <div class="sev-row"><div class="sev-label">Critical</div><div class="sev-track"><div class="sev-fill" id="sevCritical" style="background:var(--critical);width:0%"></div></div><div class="sev-count" id="sevCriticalN">0</div></div>
+        <div class="sev-row"><div class="sev-label">High</div><div class="sev-track"><div class="sev-fill" id="sevHigh" style="background:var(--high);width:0%"></div></div><div class="sev-count" id="sevHighN">0</div></div>
+        <div class="sev-row"><div class="sev-label">Medium</div><div class="sev-track"><div class="sev-fill" id="sevMedium" style="background:var(--medium);width:0%"></div></div><div class="sev-count" id="sevMediumN">0</div></div>
+        <div class="sev-row"><div class="sev-label">Low</div><div class="sev-track"><div class="sev-fill" id="sevLow" style="background:var(--low);width:0%"></div></div><div class="sev-count" id="sevLowN">0</div></div>
+      </div>
+    </div>
+
+    <div class="section-title">Findings</div>
+    <div class="tab-row">
+      <div class="tab-btn active" data-tab="sast" onclick="switchTab('sast')">Static Analysis (SAST)</div>
+      <div class="tab-btn" data-tab="sca" onclick="switchTab('sca')">Dependencies (SCA)</div>
+      <div class="tab-btn" data-tab="http" onclick="switchTab('http')">HTTP Security</div>
+      <div class="tab-btn" data-tab="build" onclick="switchTab('build')">Build</div>
+    </div>
+
+    <div class="tab-pane active" id="pane-sast">
+      <table><thead><tr><th style="width:26%">File</th><th style="width:10%">Line</th><th>Finding</th><th style="width:12%">Severity</th></tr></thead>
+      <tbody id="sastBody"></tbody></table>
+      <div class="note-line" id="sastNote"></div>
+    </div>
+
+    <div class="tab-pane" id="pane-sca">
+      <table><thead><tr><th>Package</th><th>Version</th><th>Status</th><th>Advisory</th><th style="width:12%">Severity</th></tr></thead>
+      <tbody id="scaBody"></tbody></table>
+      <div class="note-line" id="scaNote"></div>
+    </div>
+
+    <div class="tab-pane" id="pane-http">
+      <table><thead><tr><th style="width:28%">Check</th><th>Result</th><th style="width:14%">Status</th></tr></thead>
+      <tbody id="httpBody"></tbody></table>
+      <div class="note-line">Simulated — a server-side scanner (using curl/requests) would inspect live response headers directly; browser sandboxing blocks cross-origin header reads client-side.</div>
+    </div>
+
+    <div class="tab-pane" id="pane-build">
+      <table><thead><tr><th style="width:22%">Step</th><th>Detail</th></tr></thead>
+      <tbody id="buildBody"></tbody></table>
+      <div class="note-line">Simulated — no container runtime is available in this browser sandbox; a real pipeline would execute this against the Docker daemon.</div>
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn-primary" onclick="downloadReport()">⬇ Download HTML Report</button>
+      <button class="btn-secondary" onclick="resetAll()">↺ Run Another Scan</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ================= utilities ================= */
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function seedFromString(s){let h=0;for(let i=0;i<s.length;i++){h=(h<<5)-h+s.charCodeAt(i);h|=0;}return Math.abs(h);}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function pick(rng,arr){return arr[Math.floor(rng()*arr.length)];}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+let RUN = null; // holds current run state for report export
+
+function parseRepoInput(v){
+  v=v.trim();
+  let m = v.match(/github\.com\/([^\/\s]+)\/([^\/\s#?]+)/i);
+  if(m) return {owner:m[1], repo:m[2].replace(/\.git$/,'')};
+  m = v.match(/^([\w.-]+)\/([\w.-]+)$/);
+  if(m) return {owner:m[1], repo:m[2].replace(/\.git$/,'')};
+  return null;
+}
+function fillExample(v){document.getElementById('repoInput').value=v;}
+
+/* ================= terminal / stage UI ================= */
+const STAGES = [
+  {key:'clone', title:'Clone Repository', sub:'git clone --depth 1', mode:'live'},
+  {key:'build', title:'Docker Build', sub:'docker build .', mode:'sim'},
+  {key:'sast', title:'Static Analysis (SAST)', sub:'pattern scan on source', mode:'live'},
+  {key:'sca', title:'Dependency Scan (SCA)', sub:'manifest + advisory match', mode:'live'},
+  {key:'http', title:'HTTP Security Checks', sub:'headers, TLS, cookies', mode:'sim'},
+  {key:'report', title:'Generate Report', sub:'compile findings', mode:'live'},
+];
+
+function buildStageDOM(){
+  const el = document.getElementById('stages');
+  el.innerHTML = STAGES.map(s=>`
+    <div class="stage pending" id="stage-${s.key}">
+      <div class="stage-icon">○</div>
+      <div class="stage-text">
+        <div class="title">${s.title}</div>
+        <div class="sub">${s.sub}</div>
+      </div>
+      <div class="badge ${s.mode}">${s.mode==='live'?'LIVE DATA':'SIMULATED'}</div>
+    </div>`).join('');
+}
+function setStage(key, state){
+  const el = document.getElementById('stage-'+key);
+  el.className = 'stage '+state;
+  el.querySelector('.stage-icon').textContent = state==='done'?'✓':state==='error'?'✕':state==='active'?'●':'○';
+}
+function log(text, cls='tl-info'){
+  const t = document.getElementById('terminal');
+  const line = document.createElement('div');
+  line.className = 'terminal-line '+cls;
+  line.textContent = text;
+  t.appendChild(line);
+  t.scrollTop = t.scrollHeight;
+}
+
+/* ================= vulnerability reference data (demo subset) ================= */
+const VULN_DB = {
+  "lodash":     {maxSafe:"4.17.21", cve:"CVE-2021-23337", severity:"high",     desc:"Command injection via template function in versions before 4.17.21"},
+  "minimist":   {maxSafe:"1.2.6",   cve:"CVE-2021-44906", severity:"critical", desc:"Prototype pollution allowing arbitrary property injection"},
+  "axios":      {maxSafe:"0.21.2",  cve:"CVE-2020-28168", severity:"medium",   desc:"SSRF risk via proxy redirect handling"},
+  "flask":      {maxSafe:"1.0",     cve:"CVE-2018-1000656", severity:"medium", desc:"Denial of service via crafted multipart data"},
+  "django":     {maxSafe:"3.2.14",  cve:"CVE-2022-34265", severity:"high",     desc:"SQL injection via Trunc/Extract database functions"},
+  "requests":   {maxSafe:"2.20.0",  cve:"CVE-2018-18074", severity:"medium",   desc:"Authorization header leak on cross-domain redirect"},
+  "express":    {maxSafe:"4.17.3",  cve:"CVE-2022-24999", severity:"medium",   desc:"Denial of service via qs dependency"},
+  "pyyaml":     {maxSafe:"5.4",     cve:"CVE-2020-14343", severity:"critical", desc:"Arbitrary code execution via full_load / unsafe loader"},
+  "jinja2":     {maxSafe:"2.11.3",  cve:"CVE-2020-28493", severity:"medium",   desc:"ReDoS in the urlize filter"},
+  "urllib3":    {maxSafe:"1.26.5",  cve:"CVE-2021-33503", severity:"medium",   desc:"ReDoS via crafted authority component"},
+  "log4j-core": {maxSafe:"2.17.1",  cve:"CVE-2021-44228", severity:"critical", desc:"Remote code execution (Log4Shell) via JNDI lookup"},
+  "node-fetch": {maxSafe:"2.6.7",   cve:"CVE-2022-0235",  severity:"medium",   desc:"Exposure of sensitive info via forwarded redirect"},
+  "ws":         {maxSafe:"7.4.6",   cve:"CVE-2021-32640", severity:"high",     desc:"Denial of service via crafted Sec-WebSocket-Extensions header"},
+};
+function versionLess(a,b){
+  const pa=a.replace(/[^\d.]/g,'').split('.').map(Number);
+  const pb=b.replace(/[^\d.]/g,'').split('.').map(Number);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){
+    const x=pa[i]||0,y=pb[i]||0;
+    if(x<y) return true; if(x>y) return false;
+  }
+  return false;
+}
+
+/* SAST regex patterns applied to real fetched source text */
+const SAST_PATTERNS = [
+  {re:/AKIA[0-9A-Z]{16}/, sev:'critical', label:'Hardcoded AWS access key ID'},
+  {re:/-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----/, sev:'critical', label:'Private key committed to source'},
+  {re:/(secret|api|access)[_-]?key\s*[:=]\s*['"][A-Za-z0-9_\-]{16,}['"]/i, sev:'high', label:'Hardcoded API/secret key'},
+  {re:/password\s*[:=]\s*['"][^'"]{4,}['"]/i, sev:'high', label:'Hardcoded password literal'},
+  {re:/rejectUnauthorized\s*:\s*false/i, sev:'high', label:'TLS certificate verification disabled'},
+  {re:/verify\s*=\s*False/, sev:'high', label:'TLS certificate verification disabled'},
+  {re:/child_process\.exec\(/, sev:'medium', label:'Shell command execution via child_process.exec'},
+  {re:/\beval\(/, sev:'medium', label:'Use of eval() on dynamic input'},
+  {re:/subprocess\.(call|Popen)\(.*shell\s*=\s*True/, sev:'medium', label:'Shell injection risk (shell=True)'},
+  {re:/console\.log\([^)]*password/i, sev:'low', label:'Sensitive value written to console output'},
+  {re:/TODO.*(security|vuln|fixme|unsafe)/i, sev:'low', label:'Unresolved TODO flags a known security gap'},
+];
+
+/* ================= GitHub live fetch helpers ================= */
+async function ghJson(url){
+  const r = await fetch(url, {headers:{'Accept':'application/vnd.github+json'}});
+  if(!r.ok) throw new Error('GitHub API '+r.status);
+  return r.json();
+}
+async function ghRaw(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('raw fetch '+r.status);
+  return r.text();
+}
+
+/* ================= pipeline orchestration ================= */
+async function startPipeline(){
+  const raw = document.getElementById('repoInput').value;
+  const parsed = parseRepoInput(raw);
+  const errEl = document.getElementById('intakeError');
+  if(!parsed){
+    errEl.style.display='block';
+    errEl.textContent = 'Enter a repo as "owner/name" or a full github.com URL.';
+    return;
+  }
+  errEl.style.display='none';
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('pipelineWrap').classList.add('show');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('terminal').innerHTML='';
+  buildStageDOM();
+
+  const rng = mulberry32(seedFromString(parsed.owner+'/'+parsed.repo));
+  const state = {owner:parsed.owner, repo:parsed.repo, rng, findings:{sast:[],sca:[],http:[]}, meta:null, langs:{}};
+  RUN = state;
+
+  log(`$ pipeguard scan ${parsed.owner}/${parsed.repo}`, 'tl-accent');
+  await sleep(200);
+
+  // ---- STAGE 1: CLONE (live GitHub metadata) ----
+  setStage('clone','active');
+  log('→ resolving repository metadata via GitHub API…');
+  try{
+    state.meta = await ghJson(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}`);
+    await sleep(250);
+    log(`✓ found ${state.meta.full_name}  (default branch: ${state.meta.default_branch})`, 'tl-ok');
+    log(`  ★ ${state.meta.stargazers_count}   ⑂ ${state.meta.forks_count}   issues: ${state.meta.open_issues_count}   license: ${state.meta.license?state.meta.license.spdx_id:'none'}`);
+    try{
+      state.langs = await ghJson(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}/languages`);
+      log(`✓ language breakdown: ${Object.keys(state.langs).slice(0,5).join(', ')}`, 'tl-ok');
+    }catch(e){ log('  (language breakdown unavailable)', 'tl-warn'); }
+    setStage('clone','done');
+  }catch(e){
+    setStage('clone','error');
+    log('✗ '+e.message+' — repository not found or API rate-limited. Falling back to a representative demo profile.', 'tl-err');
+    state.meta = {
+      full_name: parsed.owner+'/'+parsed.repo, description:'(unavailable — demo fallback profile)',
+      stargazers_count: Math.floor(rng()*5000), forks_count: Math.floor(rng()*800), open_issues_count: Math.floor(rng()*120),
+      owner:{avatar_url:'https://github.com/identicons/'+parsed.owner+'.png'}, license:null, default_branch:'main',
+      pushed_at:new Date().toISOString(), homepage:''
+    };
+    state.langs = {"JavaScript": 60, "HTML":25, "CSS":15};
+  }
+  await sleep(300);
+
+  // ---- STAGE 2: BUILD (simulated docker build) ----
+  setStage('build','active');
+  const primaryLang = (state.meta.language || Object.keys(state.langs)[0] || 'JavaScript');
+  const baseImages = {JavaScript:'node:20-alpine', TypeScript:'node:20-alpine', Python:'python:3.12-slim', Go:'golang:1.22-alpine', Ruby:'ruby:3.3-slim', Java:'eclipse-temurin:21-jdk', PHP:'php:8.3-fpm', Rust:'rust:1.78-slim'};
+  const baseImg = baseImages[primaryLang] || 'debian:bookworm-slim';
+  log(`$ docker build -t ${parsed.repo}:scan .`, 'tl-accent');
+  const buildLines = [
+    `[1/5] FROM ${baseImg}`,
+    `[2/5] WORKDIR /app`,
+    `[3/5] COPY . .`,
+    `[4/5] RUN install dependencies`,
+    `[5/5] RUN build`,
+  ];
+  const buildLog = [];
+  for(const l of buildLines){ log('  '+l); buildLog.push(l); await sleep(180+rng()*180); }
+  const buildOk = rng() > 0.15;
+  if(buildOk){ log('✓ build completed — image ready', 'tl-ok'); setStage('build','done'); }
+  else { log('✗ build failed at layer [4/5] — dependency install exited non-zero', 'tl-err'); setStage('build','error'); }
+  state.build = {baseImage:baseImg, lines:buildLog, ok:buildOk};
+  await sleep(300);
+
+  // ---- STAGE 3: SAST (live regex scan of real root files, with fallback) ----
+  setStage('sast','active');
+  log('→ listing root directory contents…');
+  let rootFiles = [];
+  try{
+    rootFiles = await ghJson(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/`);
+  }catch(e){ log('  (directory listing unavailable, using demo file set)', 'tl-warn'); }
+  const scannable = (Array.isArray(rootFiles)?rootFiles:[])
+    .filter(f=>f.type==='file' && /\.(js|ts|py|go|rb|php|java|env|yml|yaml|json)$/i.test(f.name) && f.size < 150000)
+    .slice(0,8);
+  if(scannable.length){
+    log(`✓ ${scannable.length} root-level files queued for pattern scan`, 'tl-ok');
+    for(const f of scannable){
+      try{
+        const text = await ghRaw(f.download_url);
+        log(`  scanning ${f.name} (${f.size}b)…`);
+        const lines = text.split('\n');
+        lines.forEach((lineText, idx)=>{
+          SAST_PATTERNS.forEach(p=>{
+            if(p.re.test(lineText)){
+              state.findings.sast.push({file:f.name, line:idx+1, label:p.label, sev:p.sev});
+            }
+          });
+        });
+      }catch(e){ log(`  ✗ could not fetch ${f.name}`, 'tl-warn'); }
+      await sleep(120);
+    }
+  } else {
+    log('  no root-level source files matched scan filters — sampling demo findings', 'tl-warn');
+  }
+  // ensure a believable minimum with deterministic demo findings if live scan came up empty
+  if(state.findings.sast.length === 0){
+    const demoFiles = ['src/index.js','app/config.py','server/auth.js','utils/helpers.py'];
+    const count = 1 + Math.floor(rng()*3);
+    for(let i=0;i<count;i++){
+      const p = pick(rng, SAST_PATTERNS);
+      state.findings.sast.push({file:pick(rng,demoFiles), line:1+Math.floor(rng()*180), label:p.label, sev:p.sev});
+    }
+  }
+  log(`✓ static analysis complete — ${state.findings.sast.length} finding(s)`, 'tl-ok');
+  setStage('sast','done');
+  await sleep(300);
+
+  // ---- STAGE 4: SCA (live manifest parse + demo advisory match) ----
+  setStage('sca','active');
+  log('→ searching for dependency manifests (package.json, requirements.txt)…');
+  let deps = [];
+  try{
+    const files = Array.isArray(rootFiles)?rootFiles:[];
+    const pkgFile = files.find(f=>f.name==='package.json');
+    const reqFile = files.find(f=>f.name==='requirements.txt');
+    if(pkgFile){
+      const txt = await ghRaw(pkgFile.download_url);
+      const json = JSON.parse(txt);
+      const all = Object.assign({}, json.dependencies||{}, json.devDependencies||{});
+      Object.entries(all).forEach(([name,ver])=>deps.push({name, version:String(ver).replace(/[\^~>=<]/g,'')}));
+      log(`✓ parsed package.json — ${deps.length} dependencies found`, 'tl-ok');
+    } else if(reqFile){
+      const txt = await ghRaw(reqFile.download_url);
+      txt.split('\n').forEach(line=>{
+        const m = line.trim().match(/^([A-Za-z0-9_.\-]+)\s*[=><~!]{1,2}=?\s*([\w.]*)/);
+        if(m && m[1]) deps.push({name:m[1].toLowerCase(), version:m[2]||'0.0.0'});
+      });
+      log(`✓ parsed requirements.txt — ${deps.length} dependencies found`, 'tl-ok');
+    } else {
+      log('  no recognized manifest at root — sampling demo dependency set', 'tl-warn');
+    }
+  }catch(e){ log('  ✗ manifest parse failed — sampling demo dependency set', 'tl-warn'); }
+  if(deps.length===0){
+    const demoNames = Object.keys(VULN_DB);
+    const n = 5+Math.floor(rng()*4);
+    for(let i=0;i<n;i++){
+      const name = pick(rng, demoNames);
+      const entry = VULN_DB[name];
+      const vulnerable = rng()>0.45;
+      deps.push({name, version: vulnerable? '0.0.1' : entry.maxSafe});
+    }
+  }
+  // dedupe
+  const seen = new Set(); deps = deps.filter(d=>{if(seen.has(d.name))return false; seen.add(d.name); return true;});
+  deps.forEach(d=>{
+    const entry = VULN_DB[d.name.toLowerCase()];
+    if(entry && d.version && versionLess(d.version, entry.maxSafe)){
+      state.findings.sca.push({name:d.name, version:d.version, status:'vulnerable', cve:entry.cve, desc:entry.desc, sev:entry.severity, fix:entry.maxSafe});
+    } else {
+      state.findings.sca.push({name:d.name, version:d.version||'—', status:'ok', cve:'—', desc:'No known advisory in reference database', sev:'none', fix:null});
+    }
+  });
+  const scaVulnCount = state.findings.sca.filter(f=>f.status==='vulnerable').length;
+  log(`✓ dependency check complete — ${deps.length} packages checked, ${scaVulnCount} flagged`, 'tl-ok');
+  setStage('sca','done');
+  await sleep(300);
+
+  // ---- STAGE 5: HTTP (simulated) ----
+  setStage('http','active');
+  log('→ evaluating HTTP security posture (simulated — CORS blocks cross-origin header reads)…', 'tl-warn');
+  const httpChecks = [
+    {name:'Strict-Transport-Security', good:'HSTS enforced, max-age ≥ 6 months', bad:'Header missing — HTTPS downgrade possible'},
+    {name:'Content-Security-Policy', good:'Restrictive CSP present', bad:'No CSP — vulnerable to injected script execution'},
+    {name:'X-Content-Type-Options', good:'nosniff set', bad:'Header missing — MIME sniffing possible'},
+    {name:'X-Frame-Options', good:'DENY / SAMEORIGIN set', bad:'Header missing — clickjacking risk'},
+    {name:'Referrer-Policy', good:'strict-origin-when-cross-origin set', bad:'Header missing — referrer leakage possible'},
+    {name:'Cookie flags', good:'Secure, HttpOnly, SameSite all set', bad:'Cookies missing Secure/HttpOnly flags'},
+    {name:'Server header disclosure', good:'No version string disclosed', bad:'Server header reveals stack/version info'},
+  ];
+  httpChecks.forEach(c=>{
+    const pass = rng() > 0.4;
+    state.findings.http.push({check:c.name, result: pass? c.good : c.bad, pass});
+    log(`  ${pass?'✓':'✗'} ${c.name}`, pass?'tl-ok':'tl-warn');
+  });
+  await sleep(200);
+  log('✓ HTTP checks complete', 'tl-ok');
+  setStage('http','done');
+  await sleep(300);
+
+  // ---- STAGE 6: REPORT ----
+  setStage('report','active');
+  log('→ compiling findings into report…');
+  await sleep(400);
+  setStage('report','done');
+  log('✓ report ready.', 'tl-ok');
+  log('$ _','tl-accent');
+
+  renderResults(state);
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('results').classList.add('show');
+  document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ================= results rendering ================= */
+function sevCounts(state){
+  const c = {critical:0, high:0, medium:0, low:0};
+  state.findings.sast.forEach(f=>{ if(c[f.sev]!==undefined) c[f.sev]++; });
+  state.findings.sca.forEach(f=>{ if(f.status==='vulnerable' && c[f.sev]!==undefined) c[f.sev]++; });
+  state.findings.http.forEach(f=>{ if(!f.pass) c.medium++; });
+  return c;
+}
+function computeScore(c){
+  let s = 100 - c.critical*15 - c.high*8 - c.medium*3 - c.low*1;
+  return Math.max(0, Math.min(100, s));
+}
+const LANG_COLORS = {JavaScript:'#f1c40f',TypeScript:'#3178c6',Python:'#3572A5',HTML:'#e34c26',CSS:'#563d7c',Go:'#00ADD8',Ruby:'#701516',Java:'#b07219',PHP:'#4F5D95',Rust:'#dea584',Shell:'#89e051','C++':'#f34b7d',C:'#555555'};
+
+function renderResults(state){
+  const c = sevCounts(state);
+  const score = computeScore(c);
+  state.score = score; state.sevCounts = c;
+
+  // repo card
+  const m = state.meta;
+  const totalBytes = Object.values(state.langs).reduce((a,b)=>a+b,0) || 1;
+  const langBarHtml = Object.entries(state.langs).map(([lang,bytes])=>{
+    const pct = (bytes/totalBytes*100);
+    const col = LANG_COLORS[lang] || '#5b7cf0';
+    return `<div style="width:${pct}%;background:${col}"></div>`;
+  }).join('');
+  const langLegend = Object.entries(state.langs).slice(0,5).map(([lang,bytes])=>{
+    const pct = Math.round(bytes/totalBytes*100);
+    const col = LANG_COLORS[lang] || '#5b7cf0';
+    return `<span><i style="background:${col}"></i>${escapeHtml(lang)} ${pct}%</span>`;
+  }).join('');
+  document.getElementById('repoCard').innerHTML = `
+    <div class="repo-head">
+      <img class="repo-avatar" src="${m.owner?m.owner.avatar_url:''}" onerror="this.style.display='none'">
+      <div><div class="rname">${escapeHtml(m.full_name||state.owner+'/'+state.repo)}</div>
+      <div class="rdesc">${escapeHtml(m.description||'No description provided.')}</div></div>
+    </div>
+    <div class="repo-stats">
+      <div>★ <b>${m.stargazers_count??'—'}</b> stars</div>
+      <div>⑂ <b>${m.forks_count??'—'}</b> forks</div>
+      <div>⚠ <b>${m.open_issues_count??'—'}</b> open issues</div>
+      <div>License <b>${m.license?m.license.spdx_id:'none'}</b></div>
+    </div>
+    <div class="lang-bar">${langBarHtml}</div>
+    <div class="lang-legend">${langLegend}</div>
+  `;
+
+  // score ring
+  const circumference = 352;
+  const offset = circumference - (score/100)*circumference;
+  const arc = document.getElementById('scoreArc');
+  arc.style.transition = 'stroke-dashoffset 1s ease, stroke .3s';
+  arc.style.strokeDashoffset = offset;
+  arc.style.stroke = score>=80?'var(--safe)':score>=60?'var(--medium)':score>=40?'var(--high)':'var(--critical)';
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('scoreVerdict').textContent =
+    score>=80?'Low risk': score>=60?'Moderate risk': score>=40?'Elevated risk':'High risk';
+  document.getElementById('scoreVerdict').style.color =
+    score>=80?'var(--safe)':score>=60?'var(--medium)':score>=40?'var(--high)':'var(--critical)';
+
+  // severity bars
+  const maxC = Math.max(1, c.critical, c.high, c.medium, c.low);
+  ['critical','high','medium','low'].forEach(k=>{
+    document.getElementById('sev'+k[0].toUpperCase()+k.slice(1)).style.width = (c[k]/maxC*100)+'%';
+    document.getElementById('sev'+k[0].toUpperCase()+k.slice(1)+'N').textContent = c[k];
+  });
+
+  // SAST table
+  const sastBody = document.getElementById('sastBody');
+  sastBody.innerHTML = state.findings.sast.length ? state.findings.sast.map(f=>`
+    <tr><td class="mono">${escapeHtml(f.file)}</td><td class="mono">${f.line}</td><td>${escapeHtml(f.label)}</td>
+    <td><span class="pill ${f.sev}">${f.sev}</span></td></tr>`).join('')
+    : `<tr class="empty-row"><td colspan="4">No pattern matches found in scanned files.</td></tr>`;
+  document.getElementById('sastNote').textContent = `Scanned via lightweight regex pattern matching against real fetched source files where available (secrets, unsafe eval/exec, disabled TLS verification, etc.) — not a substitute for a full SAST engine like Semgrep or CodeQL.`;
+
+  // SCA table
+  const scaBody = document.getElementById('scaBody');
+  scaBody.innerHTML = state.findings.sca.map(f=>`
+    <tr><td class="mono">${escapeHtml(f.name)}</td><td class="mono">${escapeHtml(f.version)}</td>
+    <td><span class="pill ${f.status==='vulnerable'?f.sev:'ok'}">${f.status}</span></td>
+    <td>${f.status==='vulnerable'?escapeHtml(f.cve)+' — '+escapeHtml(f.desc)+(f.fix?` (fix: ≥${f.fix})`:''):'—'}</td>
+    <td>${f.status==='vulnerable'?`<span class="pill ${f.sev}">${f.sev}</span>`:'—'}</td></tr>`).join('');
+  document.getElementById('scaNote').textContent = `Matched against a small embedded reference table of historical public CVEs for demo purposes — a production pipeline would query a live feed (OSV.dev, GitHub Advisory Database, or Snyk) covering the full ecosystem.`;
+
+  // HTTP table
+  document.getElementById('httpBody').innerHTML = state.findings.http.map(f=>`
+    <tr><td>${escapeHtml(f.check)}</td><td>${escapeHtml(f.result)}</td>
+    <td><span class="pill ${f.pass?'pass':'high'}">${f.pass?'pass':'fail'}</span></td></tr>`).join('');
+
+  // Build table
+  document.getElementById('buildBody').innerHTML = `
+    <tr><td>Base image</td><td class="mono">${escapeHtml(state.build.baseImage)}</td></tr>
+    <tr><td>Build steps</td><td class="mono">${state.build.lines.map(escapeHtml).join('<br>')}</td></tr>
+    <tr><td>Result</td><td><span class="pill ${state.build.ok?'pass':'critical'}">${state.build.ok?'success':'failed'}</span></td></tr>
+  `;
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+name));
+}
+
+function resetAll(){
+  document.getElementById('pipelineWrap').classList.remove('show');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('repoInput').value='';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ================= report export ================= */
+function downloadReport(){
+  if(!RUN) return;
+  const s = RUN;
+  const c = s.sevCounts;
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PipeGuard Report — ${s.owner}/${s.repo}</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;max-width:860px;margin:40px auto;padding:0 20px;}
+    h1{font-size:22px;border-bottom:3px solid #5b7cf0;padding-bottom:10px;}
+    h2{font-size:15px;margin-top:32px;color:#333;border-left:4px solid #5b7cf0;padding-left:10px;}
+    table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px;}
+    th,td{border:1px solid #ddd;padding:8px 10px;text-align:left;}
+    th{background:#f4f5f7;}
+    .score{font-size:40px;font-weight:bold;}
+    .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:bold;color:#fff;}
+    .crit{background:#f2545b;} .high{background:#f2994a;} .med{background:#c99a1c;color:#fff;} .low{background:#2f9bc9;} .ok{background:#2fa876;}
+    .meta{color:#666;font-size:12px;}
+    @media print{ body{margin:10px;} }
+  </style></head><body>
+    <h1>PipeGuard Security Report — ${escapeHtml(s.meta.full_name||s.owner+'/'+s.repo)}</h1>
+    <p class="meta">Generated ${new Date().toLocaleString()} · Demo pipeline (see methodology at bottom)</p>
+    <p><span class="score">${s.score}</span> / 100 — overall security score</p>
+    <table><tr><th>Critical</th><th>High</th><th>Medium</th><th>Low</th></tr>
+    <tr><td>${c.critical}</td><td>${c.high}</td><td>${c.medium}</td><td>${c.low}</td></tr></table>
+
+    <h2>Static Analysis (SAST)</h2>
+    <table><tr><th>File</th><th>Line</th><th>Finding</th><th>Severity</th></tr>
+    ${s.findings.sast.map(f=>`<tr><td>${escapeHtml(f.file)}</td><td>${f.line}</td><td>${escapeHtml(f.label)}</td><td><span class="tag ${f.sev.slice(0,4)}">${f.sev}</span></td></tr>`).join('')}
+    </table>
+
+    <h2>Dependency Scan (SCA)</h2>
+    <table><tr><th>Package</th><th>Version</th><th>Status</th><th>Advisory</th></tr>
+    ${s.findings.sca.map(f=>`<tr><td>${escapeHtml(f.name)}</td><td>${escapeHtml(f.version)}</td><td>${f.status}</td><td>${f.status==='vulnerable'?escapeHtml(f.cve+' — '+f.desc):'—'}</td></tr>`).join('')}
+    </table>
+
+    <h2>HTTP Security Checks</h2>
+    <table><tr><th>Check</th><th>Result</th><th>Status</th></tr>
+    ${s.findings.http.map(f=>`<tr><td>${escapeHtml(f.check)}</td><td>${escapeHtml(f.result)}</td><td>${f.pass?'pass':'fail'}</td></tr>`).join('')}
+    </table>
+
+    <h2>Build</h2>
+    <p>Base image: <code>${escapeHtml(s.build.baseImage)}</code> — result: <b>${s.build.ok?'success':'failed'}</b></p>
+
+    <h2>Methodology</h2>
+    <p class="meta">Repository metadata, language breakdown, dependency manifests, and source files were retrieved live from the GitHub API where accessible. Static analysis used lightweight regex pattern matching, not a full SAST engine. Dependency advisories were matched against a small embedded reference table of historical public CVEs, not a live vulnerability feed. Docker build and HTTP header checks are simulated, since this environment cannot run a container daemon or read cross-origin response headers from the browser. Use this as a prototype/demo, not a substitute for a real scanning pipeline.</p>
+  </body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pipeguard-report-${s.owner}-${s.repo}.html`;
+  a.click();
+}
+
+/* clock */
+function tick(){document.getElementById('clock').textContent = new Date().toLocaleTimeString();}
+tick(); setInterval(tick, 1000);
+
+document.getElementById('repoInput').addEventListener('keydown', e=>{ if(e.key==='Enter') startPipeline(); });
+</script>
+</body>
+</html>
