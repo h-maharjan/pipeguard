@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PipeGuard - Phase 3</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, Arial, sans-serif;
+        background: #0b1020;
+        color: #e6ecff;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 32px auto;
+        padding: 0 16px;
+      }
+
+      .card {
+        background: #121933;
+        border: 1px solid #2a345d;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      h2 {
+        margin: 0 0 8px;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: #9fb0e8;
+      }
+
+      form {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      input {
+        flex: 1;
+        min-width: 280px;
+        border-radius: 8px;
+        border: 1px solid #39467a;
+        background: #0c1430;
+        color: #e6ecff;
+        padding: 11px 12px;
+      }
+
+      button {
+        border: none;
+        border-radius: 8px;
+        background: #5b7cf0;
+        color: white;
+        padding: 11px 16px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .message {
+        margin-top: 12px;
+        min-height: 20px;
+        font-size: 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid #2a345d;
+        padding: 10px 8px;
+        font-size: 14px;
+        vertical-align: top;
+      }
+
+      .status {
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 3px 8px;
+        display: inline-block;
+      }
+
+      .status.success,
+      .status.completed {
+        background: #1c6e47;
+      }
+
+      .status.failed {
+        background: #7a2b2b;
+      }
+
+      .status.cloning,
+      .status.running,
+      .status.in_progress {
+        background: #665211;
+      }
+
+      .status.queued,
+      .status.pending {
+        background: #27416f;
+      }
+
+      .status.unsupported,
+      .status.skipped {
+        background: #565a67;
+      }
+
+      .muted {
+        color: #9fb0e8;
+      }
+
+      .logs {
+        background: #0a1128;
+        border: 1px solid #2a345d;
+        border-radius: 8px;
+        padding: 12px;
+        min-height: 220px;
+        max-height: 360px;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(180px, 1fr));
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .summary-item {
+        background: #0a1128;
+        border: 1px solid #2a345d;
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      a {
+        color: #86a8ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1>PipeGuard DevSecOps Dashboard (Phase 3)</h1>
+        <p>
+          Clone repository, run security scan pipeline, trigger Jenkins CI/CD, capture build logs,
+          and generate downloadable HTML/PDF reports.
+        </p>
+        <form id="project-form">
+          <input
+            id="repo-url"
+            type="text"
+            placeholder="https://github.com/owner/repo or owner/repo"
+            required
+          />
+          <button id="submit-btn" type="submit">Start Phase 3 Pipeline</button>
+        </form>
+        <div id="message" class="message"></div>
+      </div>
+
+      <div class="card">
+        <h2>Live Pipeline Logs</h2>
+        <p class="muted" id="active-project">No active project selected.</p>
+        <div class="summary-grid" id="live-summary">
+          <div class="summary-item muted">No summary yet.</div>
+        </div>
+        <div class="logs" id="log-output">Waiting for logs...</div>
+      </div>
+
+      <div class="card">
+        <h2>Report & Build History (Active Project)</h2>
+        <p class="muted">Revisit previous reports and download PDFs.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Run</th>
+              <th>Jenkins Build</th>
+              <th>Status</th>
+              <th>Result</th>
+              <th>Created</th>
+              <th>Report</th>
+            </tr>
+          </thead>
+          <tbody id="build-history-body">
+            <tr>
+              <td colspan="6" class="muted">No build history loaded.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Project History</h2>
+        <p class="muted">Latest 50 projects</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Repository</th>
+              <th>Clone</th>
+              <th>Phase 2</th>
+              <th>Phase 3</th>
+              <th>Jenkins</th>
+              <th>Report</th>
+              <th>Created</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr>
+              <td colspan="8" class="muted">No projects scanned yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById("project-form");
+      const repoUrlInput = document.getElementById("repo-url");
+      const submitBtn = document.getElementById("submit-btn");
+      const message = document.getElementById("message");
+      const historyBody = document.getElementById("history-body");
+      const logOutput = document.getElementById("log-output");
+      const activeProject = document.getElementById("active-project");
+      const liveSummary = document.getElementById("live-summary");
+      const buildHistoryBody = document.getElementById("build-history-body");
+
+      let activeProjectId = null;
+      let pollTimer = null;
+
+      function setMessage(text, isError = false) {
+        message.textContent = text;
+        message.style.color = isError ? "#ff7f7f" : "#8be0b4";
+      }
+
+      function summarizeJenkins(project) {
+        if (!project.latest_build_run_id) return "—";
+        const number = project.latest_jenkins_build_number
+          ? `#${project.latest_jenkins_build_number}`
+          : "queued";
+        const result = project.latest_build_result || project.latest_build_status || "unknown";
+        return `${number} (${result})`;
+      }
+
+      function summarizeReport(project) {
+        if (!project.latest_build_run_id) return "—";
+        if (!project.latest_report_generated_at) return "pending";
+        return `<a href="/api/build-runs/${project.latest_build_run_id}/report/pdf">PDF</a> · <a href="/api/build-runs/${project.latest_build_run_id}/report/html" target="_blank" rel="noreferrer">HTML</a>`;
+      }
+
+      function renderHistory(projects) {
+        if (!projects.length) {
+          historyBody.innerHTML =
+            '<tr><td colspan="8" class="muted">No projects scanned yet.</td></tr>';
+          return;
+        }
+
+        historyBody.innerHTML = projects
+          .map((project) => {
+            const created = new Date(project.created_at).toLocaleString();
+            const error = project.error_message || "—";
+            return `
+              <tr>
+                <td>${project.owner}/${project.repo}</td>
+                <td><span class="status ${project.clone_status}">${project.clone_status}</span></td>
+                <td><span class="status ${project.phase2_status}">${project.phase2_status}</span></td>
+                <td><span class="status ${project.phase3_status}">${project.phase3_status}</span></td>
+                <td>${summarizeJenkins(project)}</td>
+                <td>${summarizeReport(project)}</td>
+                <td>${created}</td>
+                <td title="${String(error).replace(/"/g, "&quot;")}">${error}</td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      function renderLiveSummary(project, latestBuild) {
+        const auditTotal = project?.audit_summary?.totalVulnerabilities;
+        const trivyTotal = project?.trivy_summary?.totalVulnerabilities;
+        const imageTag = project?.build_summary?.imageTag || "—";
+        const jenkinsText = latestBuild
+          ? `#${latestBuild.jenkins_build_number || "queued"} (${latestBuild.result || latestBuild.status})`
+          : "—";
+        liveSummary.innerHTML = `
+          <div class="summary-item">Phase 2: <b>${project.phase2_status}</b></div>
+          <div class="summary-item">Phase 3: <b>${project.phase3_status}</b></div>
+          <div class="summary-item">Jenkins: <b>${jenkinsText}</b></div>
+          <div class="summary-item">npm audit vulns: <b>${auditTotal ?? "—"}</b></div>
+          <div class="summary-item">Trivy vulns: <b>${trivyTotal ?? "—"}</b></div>
+          <div class="summary-item">Image tag: <b>${imageTag}</b></div>
+        `;
+      }
+
+      function renderBuildHistory(builds) {
+        if (!builds.length) {
+          buildHistoryBody.innerHTML =
+            '<tr><td colspan="6" class="muted">No build history available for selected project.</td></tr>';
+          return;
+        }
+
+        buildHistoryBody.innerHTML = builds
+          .map((build) => {
+            const created = new Date(build.created_at).toLocaleString();
+            const reportLinks =
+              build.report_generated_at
+                ? `<a href="/api/build-runs/${build.id}/report/pdf">PDF</a> · <a href="/api/build-runs/${build.id}/report/html" target="_blank" rel="noreferrer">HTML</a>`
+                : "pending";
+            return `
+              <tr>
+                <td>#${build.id}</td>
+                <td>${build.jenkins_build_number ? `#${build.jenkins_build_number}` : "queued"}</td>
+                <td><span class="status ${build.status}">${build.status}</span></td>
+                <td>${build.result || "—"}</td>
+                <td>${created}</td>
+                <td>${reportLinks}</td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      function stopPolling() {
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      }
+
+      async function loadHistory() {
+        const response = await fetch("/api/projects");
+        const projects = await response.json();
+        renderHistory(projects);
+      }
+
+      async function loadBuildHistory(projectId) {
+        const response = await fetch(`/api/projects/${projectId}/builds`);
+        const builds = await response.json();
+        if (!response.ok) {
+          setMessage(builds.error || "Could not fetch build history.", true);
+          return;
+        }
+        renderBuildHistory(builds);
+      }
+
+      function isFinished(project) {
+        return ["completed", "failed", "unsupported", "skipped"].includes(project.phase3_status);
+      }
+
+      async function pollProjectLogs(projectId) {
+        try {
+          const response = await fetch(`/api/projects/${projectId}/logs`);
+          const payload = await response.json();
+          if (!response.ok) {
+            setMessage(payload.error || "Could not fetch logs.", true);
+            stopPolling();
+            return;
+          }
+
+          const project = payload.project;
+          activeProject.textContent = `Active project: ${project.owner}/${project.repo} (#${project.id})`;
+          renderLiveSummary(project, payload.latestBuild);
+          logOutput.textContent = (payload.logs || []).join("\n") || "No logs yet...";
+          logOutput.scrollTop = logOutput.scrollHeight;
+
+          await Promise.all([loadHistory(), loadBuildHistory(project.id)]);
+
+          if (isFinished(project)) {
+            stopPolling();
+            setMessage(
+              `Project ${project.owner}/${project.repo} finished with phase3 status: ${project.phase3_status}`,
+              project.phase3_status === "failed"
+            );
+          }
+        } catch (_error) {
+          setMessage("Failed to load live logs.", true);
+        }
+      }
+
+      function startPolling(projectId) {
+        activeProjectId = projectId;
+        stopPolling();
+        pollProjectLogs(projectId);
+        pollTimer = setInterval(() => pollProjectLogs(projectId), 1800);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submitBtn.disabled = true;
+        setMessage("Starting phase 3 pipeline...");
+
+        try {
+          const response = await fetch("/api/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ repositoryUrl: repoUrlInput.value }),
+          });
+
+          const payload = await response.json();
+          if (!response.ok) {
+            const error =
+              payload.error || payload.error_message || "Failed to start phase 3 pipeline.";
+            setMessage(error, true);
+          } else {
+            setMessage(`Queued ${payload.owner}/${payload.repo} for phase 3 pipeline.`);
+            repoUrlInput.value = "";
+            logOutput.textContent = "Waiting for logs...";
+            startPolling(payload.id);
+          }
+          await loadHistory();
+        } catch (_error) {
+          setMessage("Request failed. Check server and database connection.", true);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      loadHistory().catch(() => setMessage("Could not load history.", true));
+      if (activeProjectId) startPolling(activeProjectId);
+    </script>
+  </body>
+</html>
