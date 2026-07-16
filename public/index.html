@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PipeGuard - Phase 1</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, Arial, sans-serif;
+        background: #0b1020;
+        color: #e6ecff;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 32px auto;
+        padding: 0 16px;
+      }
+
+      .card {
+        background: #121933;
+        border: 1px solid #2a345d;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: #9fb0e8;
+      }
+
+      form {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      input {
+        flex: 1;
+        min-width: 280px;
+        border-radius: 8px;
+        border: 1px solid #39467a;
+        background: #0c1430;
+        color: #e6ecff;
+        padding: 11px 12px;
+      }
+
+      button {
+        border: none;
+        border-radius: 8px;
+        background: #5b7cf0;
+        color: white;
+        padding: 11px 16px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .message {
+        margin-top: 12px;
+        min-height: 20px;
+        font-size: 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid #2a345d;
+        padding: 10px 8px;
+        font-size: 14px;
+      }
+
+      .status {
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 3px 8px;
+        display: inline-block;
+      }
+
+      .status.success {
+        background: #1c6e47;
+      }
+
+      .status.failed {
+        background: #7a2b2b;
+      }
+
+      .status.cloning {
+        background: #665211;
+      }
+
+      .muted {
+        color: #9fb0e8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1>PipeGuard DevSecOps Dashboard (Phase 1)</h1>
+        <p>Enter a GitHub repository URL to clone and track it in PostgreSQL.</p>
+        <form id="project-form">
+          <input
+            id="repo-url"
+            type="text"
+            placeholder="https://github.com/owner/repo or owner/repo"
+            required
+          />
+          <button id="submit-btn" type="submit">Clone Repository</button>
+        </form>
+        <div id="message" class="message"></div>
+      </div>
+
+      <div class="card">
+        <h2>Project History</h2>
+        <p class="muted">Latest 50 projects</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Repository</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr>
+              <td colspan="4" class="muted">No projects scanned yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById("project-form");
+      const repoUrlInput = document.getElementById("repo-url");
+      const submitBtn = document.getElementById("submit-btn");
+      const message = document.getElementById("message");
+      const historyBody = document.getElementById("history-body");
+
+      function setMessage(text, isError = false) {
+        message.textContent = text;
+        message.style.color = isError ? "#ff7f7f" : "#8be0b4";
+      }
+
+      function renderHistory(projects) {
+        if (!projects.length) {
+          historyBody.innerHTML =
+            '<tr><td colspan="4" class="muted">No projects scanned yet.</td></tr>';
+          return;
+        }
+
+        historyBody.innerHTML = projects
+          .map((project) => {
+            const created = new Date(project.created_at).toLocaleString();
+            const error = project.error_message || "—";
+            return `
+              <tr>
+                <td>${project.owner}/${project.repo}</td>
+                <td><span class="status ${project.clone_status}">${project.clone_status}</span></td>
+                <td>${created}</td>
+                <td title="${error.replace(/"/g, "&quot;")}">${error}</td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      async function loadHistory() {
+        const response = await fetch("/api/projects");
+        const projects = await response.json();
+        renderHistory(projects);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submitBtn.disabled = true;
+        setMessage("Cloning repository...");
+
+        try {
+          const response = await fetch("/api/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ repositoryUrl: repoUrlInput.value }),
+          });
+
+          const payload = await response.json();
+          if (!response.ok) {
+            const error =
+              payload.error || payload.error_message || "Failed to clone repository.";
+            setMessage(error, true);
+          } else {
+            setMessage(`Saved ${payload.owner}/${payload.repo} with status: ${payload.clone_status}`);
+            repoUrlInput.value = "";
+          }
+          await loadHistory();
+        } catch (error) {
+          setMessage("Request failed. Check server and database connection.", true);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      loadHistory().catch(() => setMessage("Could not load history.", true));
+    </script>
+  </body>
+</html>
